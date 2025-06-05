@@ -6,8 +6,8 @@ use std::process::Command;
 
 #[derive(Debug)]
 pub struct Linker {
-    exec: PathBuf,
-    objects: Vec<PathBuf>,
+    pub exec: PathBuf,
+    pub objects: Vec<PathBuf>,
 }
 
 pub struct LinkerBuilder {
