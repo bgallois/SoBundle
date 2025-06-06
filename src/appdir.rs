@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -13,6 +14,7 @@ pub struct AppDir {
 pub struct AppDirBuilder {
     path: PathBuf,
     linker: super::Linker,
+    bundle: bool,
 }
 
 impl AppDirBuilder {
@@ -25,6 +27,7 @@ impl AppDirBuilder {
         Self {
             path: path.to_path_buf(),
             linker,
+            bundle: false,
         }
     }
 
@@ -36,6 +39,50 @@ impl AppDirBuilder {
         }
         self.path = path.to_path_buf();
         self
+    }
+
+    pub fn with_bundle(mut self) -> Self {
+        self.bundle = true;
+        self
+    }
+
+    fn bundle(&self) {
+        let name = self
+            .linker
+            .exec
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let run_path = self.path.join("run.sh");
+        let run_content = format!(
+            "#!/bin/sh\nDIR=$(dirname \"$0\")\nexport LD_LIBRARY_PATH=\"$DIR/lib\"\nexec \"$DIR/{}\" \"$@\"\n",
+            name
+        );
+
+        fs::write(&run_path, run_content).expect("Failed to write run file");
+
+        let mut perms = fs::metadata(&run_path)
+            .expect("Failed to get metadata")
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&run_path, perms).expect("Failed to set permissions");
+
+        Command::new("makeself")
+            .current_dir(self.path.parent().unwrap())
+            .arg("--notemp")
+            .arg(self.path.clone())
+            .arg(format!("{}.run", name))
+            .arg(format!("{} App", name))
+            .arg("./run.sh")
+            .status()
+            .expect("failed to run patchelf")
+            .success()
+            .then_some(())
+            .expect("patchelf failed");
+
+        fs::remove_dir_all(self.path.clone()).expect("Failed to remove directory");
     }
 
     fn patch_qt(&self) {
@@ -114,6 +161,9 @@ impl AppDirBuilder {
         self.copy_exec();
         self.copy_files();
         self.patch_files();
+        if self.bundle {
+            self.bundle();
+        }
         AppDir {
             path: self.path.clone(),
         }

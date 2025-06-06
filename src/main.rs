@@ -15,6 +15,8 @@ struct Args {
     appdir: Option<String>,
     #[arg(short, long)]
     qt: Option<String>,
+    #[arg(short, long)]
+    bundle: bool,
 }
 
 fn main() {
@@ -24,5 +26,9 @@ fn main() {
         linker = linker.with_qt(qt);
     }
     let linker = linker.build();
-    let appdir = AppDirBuilder::new(linker).build();
+    let mut appdir = AppDirBuilder::new(linker);
+    if args.bundle {
+        appdir = appdir.with_bundle();
+    }
+    let appdir = appdir.build();
 }
