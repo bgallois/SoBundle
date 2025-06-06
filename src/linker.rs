@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -54,18 +55,18 @@ impl LinkerBuilder {
     }
 
     pub fn new(exec: impl AsRef<Path>) -> Self {
+        let exec = fs::canonicalize(exec.as_ref()).expect("Wrong exec path");
         Self {
-            exec: exec.as_ref().to_path_buf(),
+            exec: exec,
             qt: None,
         }
     }
 
     pub fn with_qt(mut self, path: impl AsRef<Path>) -> Self {
-        let path = path.as_ref().join("plugins");
+        let path = fs::canonicalize(path.as_ref())
+            .expect("Wrong Qt path")
+            .join("plugins");
 
-        if !path.exists() {
-            panic!("Wrong qt path!")
-        }
         self.qt = Some(path.to_path_buf());
         self
     }
