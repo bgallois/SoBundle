@@ -1,3 +1,4 @@
+use super::SKIP_LIBS;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -8,6 +9,32 @@ use walkdir::WalkDir;
 #[derive(Debug)]
 pub struct AppDir {
     path: PathBuf,
+}
+
+impl AppDir {
+    pub fn check_rpath(&self) {
+        for entry in WalkDir::new(&self.path) {
+            match entry {
+                Ok(e) if e.file_type().is_file() => {
+                    let output = Command::new("ldd")
+                        .arg(e.path())
+                        .output()
+                        .expect("failed to execute process");
+
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    for line in stdout.lines() {
+                        if (line.contains("/usr/lib/") || line.contains("/lib/x86_64-linux-gnu/"))
+                            && !SKIP_LIBS.iter().any(|lib| line.contains(lib))
+                        {
+                            panic!("RPathes not set correcly! {}", e.path().display())
+                        }
+                    }
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+    }
 }
 
 pub struct AppDirBuilder {
@@ -31,11 +58,10 @@ impl AppDirBuilder {
     }
 
     pub fn with_path(mut self, path: impl AsRef<Path>) -> Self {
-        let path = path.as_ref().join("appdir");
+        let path = fs::canonicalize(path.as_ref())
+            .expect("Wrong Qt path")
+            .join("appdir");
 
-        if !path.exists() {
-            panic!("Wrong appdir path!")
-        }
         self.path = path.to_path_buf();
         self
     }
@@ -71,7 +97,7 @@ impl AppDirBuilder {
         Command::new("makeself")
             .current_dir(self.path.parent().unwrap())
             .arg("--notemp")
-            .arg(self.path.clone())
+            .arg(&self.path)
             .arg(format!("{}.run", name))
             .arg(format!("{} App", name))
             .arg("./run.sh")
@@ -81,16 +107,26 @@ impl AppDirBuilder {
             .then_some(())
             .expect("patchelf failed");
 
-        fs::remove_dir_all(self.path.clone()).expect("Failed to remove directory");
+        fs::remove_dir_all(&self.path).expect("Failed to remove directory");
     }
 
     fn patch_qt(&self) {
         for entry in WalkDir::new(self.path.join("plugins")) {
             match entry {
                 Ok(e) if e.file_type().is_file() => {
+                    let mut rpath = PathBuf::from("$ORIGIN");
+                    let depth = e
+                        .path()
+                        .strip_prefix(&self.path)
+                        .unwrap()
+                        .components()
+                        .count();
+                    for _ in 1..depth {
+                        rpath.push("..");
+                    }
                     Command::new("patchelf")
                         .arg("--set-rpath")
-                        .arg("$ORIGIN/../../lib/")
+                        .arg(rpath.join("lib"))
                         .arg(e.path())
                         .status()
                         .expect("failed to run patchelf")
@@ -118,14 +154,14 @@ impl AppDirBuilder {
 
     fn copy_exec(&self) {
         let destination = self.path.join(self.linker.exec.file_name().unwrap());
-        fs::copy(self.linker.exec.clone(), destination).unwrap();
+        fs::copy(&self.linker.exec, destination).unwrap();
     }
 
     fn patch_files(&self) {
         Command::new("patchelf")
             .arg("--set-rpath")
             .arg("$ORIGIN/lib")
-            .arg(&self.linker.exec)
+            .arg(self.path.join(self.linker.exec.file_name().unwrap()))
             .status()
             .expect("failed to run patchelf")
             .success()
@@ -146,20 +182,20 @@ impl AppDirBuilder {
     }
 
     pub fn build(&self) -> AppDir {
-        fs::create_dir(self.path.clone()).expect("Cannot create appdir");
+        fs::create_dir(&self.path).expect("Cannot create appdir");
         fs::create_dir(self.path.join("lib")).expect("Cannot create appdir");
+        self.copy_exec();
+        self.copy_files();
+        self.patch_files();
         if let Some(qt) = &self.linker.qt {
             Command::new("cp")
                 .arg("-r")
                 .arg(qt)
-                .arg(self.path.clone())
+                .arg(&self.path)
                 .status()
                 .expect("Cannot copy qt dir");
             self.patch_qt();
         }
-        self.copy_exec();
-        self.copy_files();
-        self.patch_files();
         if self.bundle {
             self.bundle();
         }

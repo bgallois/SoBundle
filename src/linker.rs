@@ -1,3 +1,4 @@
+use super::SKIP_LIBS;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -47,7 +48,7 @@ impl LinkerBuilder {
             // Examples:
             // "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f3e52a70000)"
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() == 4 {
+            if parts.len() == 4 && !SKIP_LIBS.iter().any(|lib| parts[0].starts_with(lib)) {
                 objects.insert(parts[0].to_string(), parts[2].into());
                 Self::list_objects(objects, parts[2])
             }
@@ -56,10 +57,7 @@ impl LinkerBuilder {
 
     pub fn new(exec: impl AsRef<Path>) -> Self {
         let exec = fs::canonicalize(exec.as_ref()).expect("Wrong exec path");
-        Self {
-            exec: exec,
-            qt: None,
-        }
+        Self { exec, qt: None }
     }
 
     pub fn with_qt(mut self, path: impl AsRef<Path>) -> Self {
@@ -73,7 +71,7 @@ impl LinkerBuilder {
 
     pub fn build(&self) -> Linker {
         let mut objects = HashMap::new();
-        Self::list_objects(&mut objects, self.exec.clone());
+        Self::list_objects(&mut objects, &self.exec);
         if let Some(qt) = &self.qt {
             for entry in WalkDir::new(qt) {
                 match entry {

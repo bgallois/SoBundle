@@ -1,5 +1,17 @@
 use clap::Parser;
 
+const SKIP_LIBS: [&str; 9] = [
+    "libc.so",
+    "ld-linux",
+    "libm.so",
+    "libpthread.so",
+    "libdl.so",
+    "librt.so",
+    "libnsl.so",
+    "libutil.so",
+    "libresolv.so",
+];
+
 pub mod linker;
 use linker::*;
 
@@ -30,5 +42,6 @@ fn main() {
     if args.bundle {
         appdir = appdir.with_bundle();
     }
-    let _appdir = appdir.build();
+    let appdir = appdir.build();
+    appdir.check_rpath();
 }
