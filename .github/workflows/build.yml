@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+
+    - name: 🦀 Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: 🔧 Build the project
+      run: cargo build --release
+
+    - name: 🚀 Upload to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: "continuous"
+        tag_name: "continuous"
+        files: target/release/so_bundle
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
