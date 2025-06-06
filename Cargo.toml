@@ -2,6 +2,13 @@
 name = "so_bundle"
 version = "0.1.0"
 edition = "2024"
+authors = ["Benjamin Gallois <benjamin@gallois.cc>"]
+description = "Bundle your Linux executable and its shared libraries (including Qt) into an AppDir and a self-executing makeself archive."
+license = "MIT"
+repository = "https://github.com/bgallois/SoBundle"
+readme = "README.md"
+keywords = ["bundler", "appdir", "qt", "makeself", "rust"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }

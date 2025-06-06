@@ -30,5 +30,5 @@ fn main() {
     if args.bundle {
         appdir = appdir.with_bundle();
     }
-    let appdir = appdir.build();
+    let _appdir = appdir.build();
 }

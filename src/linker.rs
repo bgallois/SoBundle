@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -46,7 +45,7 @@ impl LinkerBuilder {
         for line in stdout.lines() {
             // Examples:
             // "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f3e52a70000)"
-            let parts: Vec<&str> = line.trim().split_whitespace().collect();
+            let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.len() == 4 {
                 objects.insert(parts[0].to_string(), parts[2].into());
                 Self::list_objects(objects, parts[2])
@@ -89,8 +88,8 @@ impl LinkerBuilder {
             exec: self.exec.clone(),
             objects: objects
                 .values()
-                .cloned()
                 .filter(|s| s.to_str() != Some("not"))
+                .cloned()
                 .collect(),
             qt: self.qt.clone(),
         }
