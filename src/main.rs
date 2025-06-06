@@ -13,11 +13,16 @@ struct Args {
     exec: String,
     #[arg(short, long)]
     appdir: Option<String>,
+    #[arg(short, long)]
+    qt: Option<String>,
 }
 
 fn main() {
     let args = Args::parse();
-    let linker = LinkerBuilder::new(args.exec).build();
-    //println!("{:?}", linker);
+    let mut linker = LinkerBuilder::new(args.exec);
+    if let Some(qt) = args.qt {
+        linker = linker.with_qt(qt);
+    }
+    let linker = linker.build();
     let appdir = AppDirBuilder::new(linker).build();
 }

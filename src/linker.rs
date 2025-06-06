@@ -3,15 +3,18 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use walkdir::WalkDir;
 
 #[derive(Debug)]
 pub struct Linker {
     pub exec: PathBuf,
     pub objects: Vec<PathBuf>,
+    pub qt: Option<PathBuf>,
 }
 
 pub struct LinkerBuilder {
     exec: PathBuf,
+    qt: Option<PathBuf>,
 }
 
 impl LinkerBuilder {
@@ -46,7 +49,7 @@ impl LinkerBuilder {
             let parts: Vec<&str> = line.trim().split_whitespace().collect();
             if parts.len() == 4 {
                 objects.insert(parts[0].to_string(), parts[2].into());
-                Self::list_objects(objects, parts[1])
+                Self::list_objects(objects, parts[2])
             }
         }
     }
@@ -54,15 +57,42 @@ impl LinkerBuilder {
     pub fn new(exec: impl AsRef<Path>) -> Self {
         Self {
             exec: exec.as_ref().to_path_buf(),
+            qt: None,
         }
+    }
+
+    pub fn with_qt(mut self, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref().join("plugins");
+
+        if !path.exists() {
+            panic!("Wrong qt path!")
+        }
+        self.qt = Some(path.to_path_buf());
+        self
     }
 
     pub fn build(&self) -> Linker {
         let mut objects = HashMap::new();
         Self::list_objects(&mut objects, self.exec.clone());
+        if let Some(qt) = &self.qt {
+            for entry in WalkDir::new(qt) {
+                match entry {
+                    Ok(e) if e.file_type().is_file() => {
+                        Self::list_objects(&mut objects, e.path());
+                    }
+                    Ok(_) => {}
+                    Err(_) => {}
+                }
+            }
+        }
         Linker {
             exec: self.exec.clone(),
-            objects: objects.values().cloned().collect(),
+            objects: objects
+                .values()
+                .cloned()
+                .filter(|s| s.to_str() != Some("not"))
+                .collect(),
+            qt: self.qt.clone(),
         }
     }
 }
