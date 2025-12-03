@@ -80,19 +80,6 @@ impl AppDirBuilder {
             .to_str()
             .unwrap()
             .to_string();
-        let run_path = self.path.join("run.sh");
-        let run_content = format!(
-            "#!/bin/sh\nDIR=$(dirname \"$0\")\nexport LD_LIBRARY_PATH=\"$DIR/lib\"\nexec \"$DIR/{}\" \"$@\"\n",
-            name
-        );
-
-        fs::write(&run_path, run_content).expect("Failed to write run file");
-
-        let mut perms = fs::metadata(&run_path)
-            .expect("Failed to get metadata")
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&run_path, perms).expect("Failed to set permissions");
 
         Command::new("makeself")
             .current_dir(self.path.parent().unwrap())
@@ -100,7 +87,7 @@ impl AppDirBuilder {
             .arg(&self.path)
             .arg(format!("{}.run", name))
             .arg(format!("{} App", name))
-            .arg("./run.sh")
+            .arg("./AppRun")
             .status()
             .expect("failed to run patchelf")
             .success()
@@ -196,6 +183,30 @@ impl AppDirBuilder {
                 .expect("Cannot copy qt dir");
             self.patch_qt();
         }
+
+        let name = self
+            .linker
+            .exec
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let run_path = self.path.join("AppRun");
+        let run_content = format!(
+            "#!/bin/sh\nDIR=$(dirname \"$0\")\nexport LD_LIBRARY_PATH=\"$DIR/lib\"\nexec \"$DIR/{}\" \"$@\"\n",
+            name
+        );
+
+        fs::write(&run_path, run_content).expect("Failed to write run file");
+
+        let mut perms = fs::metadata(&run_path)
+            .expect("Failed to get metadata")
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&run_path, perms).expect("Failed to set permissions");
+
+
         if self.bundle {
             self.bundle();
         }
