@@ -44,12 +44,16 @@ pub struct AppDirBuilder {
 }
 
 impl AppDirBuilder {
-    pub fn new(linker: super::Linker) -> Self {
-        let path = linker
-            .exec
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join("appdir");
+    pub fn new(linker: super::Linker, appdir: Option<String>) -> Self {
+        let path: PathBuf = if let Some(appdir) = appdir {
+            PathBuf::from(&appdir)
+        } else {
+            linker
+                .exec
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join("appdir")
+        };
         Self {
             path: path.to_path_buf(),
             linker,
@@ -205,7 +209,6 @@ impl AppDirBuilder {
             .permissions();
         perms.set_mode(0o755);
         fs::set_permissions(&run_path, perms).expect("Failed to set permissions");
-
 
         if self.bundle {
             self.bundle();

@@ -38,7 +38,7 @@ fn main() {
         linker = linker.with_qt(qt);
     }
     let linker = linker.build();
-    let mut appdir = AppDirBuilder::new(linker);
+    let mut appdir = AppDirBuilder::new(linker, args.appdir);
     if args.bundle {
         appdir = appdir.with_bundle();
     }
