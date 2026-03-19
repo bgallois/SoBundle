@@ -29,11 +29,17 @@ struct Args {
     qt: Option<String>,
     #[arg(short, long)]
     bundle: bool,
+    #[arg(long = "exclude")]
+    exclude_libs: Vec<String>,
 }
 
 fn main() {
     let args = Args::parse();
-    let mut linker = LinkerBuilder::new(args.exec);
+
+    let mut skip_libs: Vec<String> = SKIP_LIBS.iter().map(|s| s.to_string()).collect();
+    skip_libs.extend(args.exclude_libs);
+
+    let mut linker = LinkerBuilder::new(args.exec).with_skip_libs(skip_libs);
     if let Some(qt) = args.qt {
         linker = linker.with_qt(qt);
     }

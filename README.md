@@ -37,13 +37,14 @@ so_bundle -e <executable> [-a <appdir>] [-q <qt-path>] [-b]
 | `-a` / `--appdir` | 📁 Optional: Custom AppDir output path               |
 | `-q` / `--qt`     | 🎨 Optional: Include Qt from the given path          |
 | `-b` / `--bundle` | 📦 Optional: Package into a `.run` file via makeself |
+| ` ` / `--exclude` | 🚫 Optional, repeatable: skip libraries whose SONAME starts with the given prefix |
 
 ---
 
 ## ✨ Example
 
 ```bash
-so_bundle -e ./my_app -q /usr/lib/qt6 -b
+so_bundle -e ./my_app -q /usr/lib/qt6 -b --exclude libOpenGL.so --exclude libGLX.so
 ```
 
 This will:

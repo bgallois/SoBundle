@@ -1,4 +1,3 @@
-use super::SKIP_LIBS;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -9,6 +8,7 @@ use walkdir::WalkDir;
 #[derive(Debug)]
 pub struct AppDir {
     path: PathBuf,
+    skip_libs: Vec<String>,
 }
 
 impl AppDir {
@@ -24,7 +24,7 @@ impl AppDir {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     for line in stdout.lines() {
                         if (line.contains("/usr/lib/") || line.contains("/lib/x86_64-linux-gnu/"))
-                            && !SKIP_LIBS.iter().any(|lib| line.contains(lib))
+                            && !self.skip_libs.iter().any(|lib| line.contains(lib))
                         {
                             panic!("RPathes not set correcly! {}", e.path().display())
                         }
@@ -215,6 +215,7 @@ impl AppDirBuilder {
         }
         AppDir {
             path: self.path.clone(),
+            skip_libs: self.linker.skip_libs.clone(),
         }
     }
 }
