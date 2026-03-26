@@ -123,7 +123,9 @@ impl AppDirBuilder {
                         .expect("failed to run patchelf")
                         .success()
                         .then_some(())
-                        .expect("patchelf failed");
+                        .unwrap_or_else(|| {
+                            eprintln!("IGNORED patchelf failure on {}", e.path().display());
+                        });
                 }
                 Ok(_) => {}
                 Err(_) => {}
