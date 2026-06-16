@@ -10,34 +10,104 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+            output: so_bundle_x86_64
+
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            output: so_bundle_aarch64
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🦀 Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: 🔧 Build the project
+        run: cargo build --release --locked
+
+      - name: 📦 Prepare binary
+        run: |
+          mkdir -p dist
+          cp target/release/so_bundle "dist/${{ matrix.output }}"
+          chmod +x "dist/${{ matrix.output }}"
+          file "dist/${{ matrix.output }}"
+
+      - name: ⬆️ Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: dist/${{ matrix.output }}
+          if-no-files-found: error
+
+  release:
+    name: Publish continuous release
+    needs: build
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 📥 Checkout
-      uses: actions/checkout@v4
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: 🦀 Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      - name: ⬇️ Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
-    - name: 🔧 Build the project
-      run: cargo build --release
+      - name: 📋 Prepare release files
+        run: |
+          set -euo pipefail
 
-    - name: 🏷️ Move continuous tag to this commit
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git tag -f continuous
-        git push origin refs/tags/continuous --force
+          test -f dist/so_bundle_x86_64
+          test -f dist/so_bundle_aarch64
 
-    - name: 🚀 Upload to GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        name: "continuous"
-        tag_name: "continuous"
-        files: target/release/so_bundle
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Preserve the original filename for backward compatibility.
+          cp dist/so_bundle_x86_64 dist/so_bundle
+
+          chmod +x \
+            dist/so_bundle \
+            dist/so_bundle_x86_64 \
+            dist/so_bundle_aarch64
+
+          file \
+            dist/so_bundle \
+            dist/so_bundle_x86_64 \
+            dist/so_bundle_aarch64
+
+      - name: 🏷️ Move continuous tag to this commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag -f continuous "${GITHUB_SHA}"
+          git push origin refs/tags/continuous --force
+
+      - name: 🚀 Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: continuous
+          tag_name: continuous
+          files: |
+            dist/so_bundle
+            dist/so_bundle_x86_64
+            dist/so_bundle_aarch64
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
